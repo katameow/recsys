@@ -1,5 +1,5 @@
+import { submitSearchJob } from '@/utils/api'
 import { useChatSessionStore } from './chat-session-store'
-import { searchProducts } from '@/utils/api'
 
 export const useChatActions = () => {
   const { 
@@ -8,31 +8,49 @@ export const useChatActions = () => {
     setIsLoading, 
     createNewSession,
     switchToSession,
-    deleteSession
+    deleteSession,
+    getCurrentSession,
+    setActiveSearch,
+    clearActiveSearch
   } = useChatSessionStore()
 
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed) return
 
+    let session = getCurrentSession()
+    if (!session) {
+      const newSessionId = createNewSession()
+      session = useChatSessionStore.getState().sessions.find((s) => s.id === newSessionId) ?? null
+    }
+
+    const sessionId = session?.id
+
     addMessageToCurrentSession({ sender: "user", text: trimmed })
     setInput("")
     setIsLoading(true)
 
     try {
-      const response = await searchProducts(trimmed)
-      addMessageToCurrentSession({
-        sender: "ai",
-        text: "Here's what I found for you:",
-        productRecommendations: response.results ?? [],
-      })
+      const accepted = await submitSearchJob(trimmed)
+      if (sessionId) {
+        setActiveSearch(sessionId, {
+          query: trimmed,
+          queryHash: accepted.query_hash,
+          timelineUrl: accepted.timeline_url,
+          resultUrl: accepted.result_url,
+          status: "pending",
+          startedAt: new Date().toISOString(),
+        })
+      }
     } catch (error) {
-      console.error("Error fetching product recommendations", error)
+      console.error("Error submitting search", error)
       addMessageToCurrentSession({
         sender: "ai",
         text: "Something went wrong while searching. Please try again shortly.",
       })
-    } finally {
+      if (sessionId) {
+        clearActiveSearch(sessionId)
+      }
       setIsLoading(false)
     }
   }

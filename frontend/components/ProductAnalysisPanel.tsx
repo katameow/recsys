@@ -23,14 +23,15 @@ const take = <T,>(items: T[] | undefined | null, count: number): T[] => {
   return items.slice(0, count)
 }
 
-const highlightContent = (items?: ReviewHighlightItem[] | null) => {
+const highlightContent = (items?: ReviewHighlightItem[] | null): ReviewHighlightItem[] | null => {
   if (!items || items.length === 0) {
     return null
   }
 
-  return items
-    .map((item) => item?.summary || item?.explanation || item?.quote)
-    .filter((value): value is string => Boolean(value && value.trim()))
+  // Keep the original items but filter out any that don't have any text to show.
+  return items.filter((item) => {
+    return Boolean(item && ((item.summary && item.summary.trim()) || (item.explanation && item.explanation.trim()) || (item.quote && item.quote.trim())))
+  })
 }
 
 const formatConfidence = (value?: number | null) => {
@@ -83,11 +84,30 @@ export function ProductAnalysisPanel({ analysis, reviews, description, className
                   <Smile className="h-4 w-4" aria-hidden="true" />
                   What people love
                 </div>
-                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-success/90">
-                  {positiveHighlights.map((content, index) => (
-                    <li key={`positive-${index}`} className="flex items-start gap-2">
-                      <span className="mt-1 inline-flex h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
-                      <span>{content}</span>
+                <ul className="mt-3 space-y-4 text-sm leading-relaxed">
+                  {positiveHighlights.map((item, index) => (
+                    <li key={`positive-${index}`} className="flex flex-col gap-2">
+                      <div className="flex items-start gap-2">
+                        <span className="mt-1 inline-flex h-1.5 w-1.5 flex-shrink-0 rounded-full bg-success" aria-hidden="true" />
+                        <div className="flex-1 space-y-2">
+                          {item.summary ? (
+                            <div className="font-semibold text-foreground">{item.summary}</div>
+                          ) : null}
+                          {item.explanation ? (
+                            <div className="rounded-lg border border-success/15 bg-success/[0.03] px-3 py-2 text-[0.92rem] leading-relaxed text-success/95">
+                              {item.explanation}
+                            </div>
+                          ) : null}
+                          {item.quote ? (
+                            <div className="relative rounded-lg border-l-2 border-success/30 bg-background/50 py-2 pl-4 pr-3">
+                              <Quote className="absolute left-1 top-2 h-3 w-3 text-success/40" aria-hidden="true" />
+                              <div className="text-[0.88rem] italic leading-relaxed text-foreground/80">
+                                {item.quote}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -100,11 +120,30 @@ export function ProductAnalysisPanel({ analysis, reviews, description, className
                   <ThumbsDown className="h-4 w-4" aria-hidden="true" />
                   Things to consider
                 </div>
-                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-warning/90">
-                  {negativeHighlights.map((content, index) => (
-                    <li key={`negative-${index}`} className="flex items-start gap-2">
-                      <span className="mt-1 inline-flex h-1.5 w-1.5 rounded-full bg-warning" aria-hidden="true" />
-                      <span>{content}</span>
+                <ul className="mt-3 space-y-4 text-sm leading-relaxed">
+                  {negativeHighlights.map((item, index) => (
+                    <li key={`negative-${index}`} className="flex flex-col gap-2">
+                      <div className="flex items-start gap-2">
+                        <span className="mt-1 inline-flex h-1.5 w-1.5 flex-shrink-0 rounded-full bg-warning" aria-hidden="true" />
+                        <div className="flex-1 space-y-2">
+                          {item.summary ? (
+                            <div className="font-semibold text-foreground">{item.summary}</div>
+                          ) : null}
+                          {item.explanation ? (
+                            <div className="rounded-lg border border-warning/20 bg-warning/[0.05] px-3 py-2 text-[0.92rem] leading-relaxed text-warning/95">
+                              {item.explanation}
+                            </div>
+                          ) : null}
+                          {item.quote ? (
+                            <div className="relative rounded-lg border-l-2 border-warning/40 bg-background/50 py-2 pl-4 pr-3">
+                              <Quote className="absolute left-1 top-2 h-3 w-3 text-warning/40" aria-hidden="true" />
+                              <div className="text-[0.88rem] italic leading-relaxed text-foreground/80">
+                                {item.quote}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>

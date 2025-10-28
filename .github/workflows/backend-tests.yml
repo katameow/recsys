@@ -1,0 +1,62 @@
+name: Backend Tests
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+
+jobs:
+  tests:
+    name: backend-tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: in-memory
+            use_fakeredis: false
+            use_mock_vercel: false
+          - name: fakeredis
+            use_fakeredis: true
+            use_mock_vercel: false
+          - name: mock-vercel
+            use_fakeredis: false
+            use_mock_vercel: true
+    env:
+      USE_FAKEREDIS: ${{ matrix.use_fakeredis }}
+      USE_MOCK_VERCEL_KV: ${{ matrix.use_mock_vercel }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: backend
+        shell: bash
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.use_fakeredis }}" = "true" ]; then
+            pip install -r requirements-dev.txt
+          else
+            pip install -r requirements.txt
+            pip install pytest pytest-asyncio
+          fi
+
+      - name: Run pytest
+        working-directory: backend
+        shell: bash
+        run: |
+          source .venv/bin/activate
+          export PYTHONPATH="$PWD"
+          pytest --maxfail=1 --disable-warnings -q

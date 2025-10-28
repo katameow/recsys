@@ -1,11 +1,23 @@
- fastapi
- uvicorn
- google-cloud-bigquery
- google-cloud-aiplatform
- google-cloud-storage
- langchain>=0.1.14
- python-dotenv
- vertexai
- tiktoken
- pytest
- pytest-asyncio
+# Core API runtime
+fastapi
+uvicorn
+httpx
+python-dotenv
+PyJWT
+passlib[bcrypt]
+slowapi
+pydantic
+
+# Cloud & LLM integrations
+google-cloud-bigquery
+google-cloud-aiplatform
+google-cloud-storage
+google-cloud-logging
+langchain>=0.1.14
+vertexai
+tiktoken
+prometheus-fastapi-instrumentator
+prometheus-client
+
+# Authentication storage adapters
+redis>=5.0  # optional: install when using Redis protocol alongside Vercel KV

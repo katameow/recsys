@@ -1,0 +1,204 @@
+{
+    "query_hash": "903801cf9e8ff1ffddb8d776f21a8d6806463a59eca6a812f3f21bf90b2654b2",
+    "status": "completed",
+    "result": {
+        "query": "What are the best noise-canceling headphones?",
+        "count": 3,
+        "results": [
+            {
+                "asin": "B075CYW6RM",
+                "product_title": "Noise Cancelling Earmuffs for Kids and even Adults, Enticing and Expressive Head Band Colors, Adjustable and Comfortable for both Kids and Adults",
+                "cleaned_item_description": "Noise Cancelling Earmuffs for Kids and even Adults, Enticing and Expressive Head Band Colors, Adjustable and Comfortable for both Kids and Adults [Our certified noise dampening ear muffs are ideal for all kinds of noise cancellation. You name it - concerts, parades, taking plane rides, taking the bus back from work or school, sporting activities (like watching a game in a stadium or for shooting), studying/focusing in noisy environments (like coffee shops), your college library and loud sounds from a construction zone. They are especially great for sensory issues that just make your ears hurt a lot. Buy them for YOURSELF and a FRIEND/LOVED ONE because sharing is caring. Wear them with style! Choose from our unique selection of colors. Headbands are adjustable for different sizes. People will definitely appreciate your sense of style and flair.] EVERYONE WEARS THE SAME BORING BLACK HEAD BANDS - Have some style and wear one of our enticing, expressive Ear Shelter ear muffs! We have pleasing colors along with an eye-catching logo to give you that elegant and expressive look. ADJUSTABLE HEADBAND - Each headband is just right for you. They are adjustable so that not only can kids and teenagers wear them comfortably, but even adults can adjust them to the perfect size. That means parents and kids can share them! COMFORTABLE AND TRAVEL FRIENDLY - Avoid the roughness. Each Headband and muff is padded with a plush, soft coating so you get that comfortable experience on your head and around both ears. You can even compress them to a smaller size so that you can pack these light weights for travel easily. GENERAL NOISE SENSITIVITY FROM TRAINS, PLANES, CONCERTS & OTHER LOUD SOUNDS - Your ears are precious and delicate - Take action and protect the ears of your loved ones and yourself by getting our certified noise cancelling ear muffs. SPECIAL NEEDS AND SENSORY ISSUES CAN MAKE LOUD SOUNDS HURT YOUR EARS TOO MUCH - Don't settle for less. Try our certified noise cancelling ear muffs to make that pain the past; CE at SNR 27 dB; ANSI at NPR 21 dB; AU/NZS at SLC80 25.8 dB",
+                "product_categories": "[Baby Products, Safety, Hearing Protection Earmuffs]",
+                "similarity": 0.35633824447834217,
+                "avg_rating": 2.0,
+                "rating_count": 1,
+                "displayed_rating": "2.0",
+                "combined_score": 0.36262275297213087,
+                "reviews": [
+                    {
+                        "content": "Blocks some noise but not that much.",
+                        "rating": 2,
+                        "verified_purchase": true,
+                        "user_id": "AHYDT3ZALA4BLZMLCBYDIZHPOJ4Q",
+                        "timestamp": "2018-07-27T15:27:50.002000Z",
+                        "similarity": 0.36592990918645696,
+                        "has_rating": 1
+                    }
+                ],
+                "analysis": {
+                    "asin": "B075CYW6RM",
+                    "main_selling_points": [
+                        {
+                            "title": "Adjustable and Comfortable",
+                            "description": "These earmuffs are designed with adjustable headbands to fit both kids and adults comfortably. This feature allows for shared use between family members, making them a versatile option for various ages."
+                        },
+                        {
+                            "title": "Expressive Style",
+                            "description": "Available in a range of colors, these earmuffs provide an expressive and stylish alternative to plain black headbands. This feature allows individuals to show off their personality while wearing hearing protection."
+                        },
+                        {
+                            "title": "Noise Cancellation for Multiple Environments",
+                            "description": "The earmuffs use noise-canceling technology to provide a barrier against loud noises from concerts, planes, or sporting events. This helps protect the delicate ears of both adults and children from potential damage."
+                        }
+                    ],
+                    "best_for": "These earmuffs are best for families or individuals seeking noise reduction in loud environments. They are especially useful for those with sensory sensitivities or for protecting ears during travel or events like concerts.",
+                    "review_highlights": {
+                        "overall_sentiment": "negative",
+                        "positive": [],
+                        "negative": [
+                            {
+                                "summary": "Blocks some noise but not that much.",
+                                "explanation": "One reviewer mentioned the product did not offer substantial noise reduction. This suggests the earmuffs may not meet the needs of those seeking significant noise cancellation.",
+                                "quote": null
+                            }
+                        ]
+                    },
+                    "confidence": null,
+                    "warnings": null,
+                    "notes": null,
+                    "key_specs": [
+                        {
+                            "feature": "Adjustable Headband",
+                            "detail": "Fits kids, teens, and adults"
+                        },
+                        {
+                            "feature": "Noise Dampening",
+                            "detail": "CE at SNR 27 dB; ANSI at NPR 21 dB; AU/NZS at SLC80 25.8 dB"
+                        },
+                        {
+                            "feature": "Material",
+                            "detail": "Padded with plush, soft coating"
+                        },
+                        {
+                            "feature": "Travel Friendly",
+                            "detail": "Compressible for easy packing"
+                        }
+                    ]
+                }
+            },
+            {
+                "asin": "B07RFL534D",
+                "product_title": "Baby Ear Protection Hearing Protect Headphone Noise Cancelling Headphones for Babies (3 Months-5+) Adjustable Noise Reduction Earmuffs for Children Infants",
+                "cleaned_item_description": "Baby Ear Protection Hearing Protect Headphone Noise Cancelling Headphones for Babies (3 Months-5+) Adjustable Noise Reduction Earmuffs for Children Infants [] 🎯Vacuum cleaner noise, lawn mover, loud music, noisy construction, keep the baby awake and crying? Want to enjoy concert, firework, the parade with your baby but afraid the noisy voices can frighten babies? A baby noise canceling headphone can help you. 🎷This baby headphone has been designed for protect baby’s sensitive hearing. Softening surrounding noise, allowing babies to sleep without disturbances or having fun in kinds of outdoor activities 🍼High-density sound-absorbing sponge for maximum noise reduction, Ergonomic design, soft padded head band on top, made zero pressure on baby’s ears. Adjustable size for babies of different ages. 🚅High-quality ABS material chosen to minimize the weight which make our ear muffs highly portable and easy to carry, also super sturdy and durable. 💚Perfect for nap-time on travel, concerts, football games, cinemas, theme parks, outdoor events, firework shows, church or even airplane, train and subway.",
+                "product_categories": "[Baby Products, Nursery, Décor, Sleep Soothers]",
+                "similarity": 0.3742407278344606,
+                "avg_rating": null,
+                "rating_count": null,
+                "displayed_rating": "4.4",
+                "combined_score": 0.2619685094841224,
+                "reviews": [],
+                "analysis": {
+                    "asin": "B07RFL534D",
+                    "main_selling_points": [
+                        {
+                            "title": "Baby Hearing Protection",
+                            "description": "These headphones are designed specifically to protect babies' sensitive hearing from loud noises such as vacuum cleaners or music. This ensures a more peaceful environment for infants."
+                        },
+                        {
+                            "title": "Comfortable Design",
+                            "description": "The headphones are constructed with high-density sound-absorbing sponge and an ergonomic design to minimize pressure on the baby's ears. This ensures comfort and usability for long durations."
+                        },
+                        {
+                            "title": "Portable and Durable",
+                            "description": "The headphones are made from lightweight and durable ABS material, making them portable and suitable for travel and outdoor activities. This is beneficial for families on the go."
+                        },
+                        {
+                            "title": "Versatile Use Cases",
+                            "description": "The noise-canceling headphones are perfect for use in various loud environments, from concerts to airplanes, providing quiet for naps and fun."
+                        }
+                    ],
+                    "best_for": "These headphones are ideal for parents looking to protect their infants' hearing from loud noises in various settings, such as during travel or at events. The design prioritizes comfort and noise reduction.",
+                    "review_highlights": {
+                        "overall_sentiment": "unknown",
+                        "positive": [],
+                        "negative": []
+                    },
+                    "confidence": null,
+                    "warnings": null,
+                    "notes": null,
+                    "key_specs": [
+                        {
+                            "feature": "Age Range",
+                            "detail": "3 Months - 5+ Years"
+                        },
+                        {
+                            "feature": "Material",
+                            "detail": "ABS material"
+                        },
+                        {
+                            "feature": "Application",
+                            "detail": "Concerts, travel, theme parks"
+                        },
+                        {
+                            "feature": "Design",
+                            "detail": "Soft padded head band"
+                        }
+                    ]
+                }
+            },
+            {
+                "asin": "B07DG981FC",
+                "product_title": "Vkaiy Baby Ear Protection Noise Cancelling HeadPhones for Babies for 3 Months to 2 Years (Blue) (blue)",
+                "cleaned_item_description": "Vkaiy Baby Ear Protection Noise Cancelling HeadPhones for Babies for 3 Months to 2 Years (Blue) (blue) [WHY you need Baby Ear muffs, Undoubtedly there are many and varied benefits to providing your child with some quiet time. If you cannot apply any soundproofing to the rooms in your home, then the noise reducing earmuffs may be a good alternative., εïз No Outside Noises Anymore, Too much stimulation could be harmful, especially for children with sensory conditions like Autism and ADHD if you take them outside. Baby Ear muffs can provide a break from the stimulation, and protect baby 's hearing., εïз No Stress Anymore, High levels of noise all the time can cause your kid to be more stressed more often. The calming effect of wearing noise-cancelilng headphones can also reduce the stress the child may be feeling. Loud or unpleasant sounds can largely be filtered out, and possibly will prevent outbursts and meltdowns., εïз Don't hesitate to protect your babies, CUXUS Baby Ear Muffs Noise Protection will provide safer and quiter life for little baby with no more stressful situations.] εïзProtect Baby from Noise Effectively. Kids can perceive a noise to be up to 20 decibels louder than an adult, the Baby Ear muff with 26dB can reduce noise to a minimum. εïзSafty and Comfortable for Baby. The baby earmuffs is made from High-quality ABS with Super soft soundproof cotton. Our earmuffs is highly portable and easy to carry, also super sturdy and durable. εïзLightweight and Durabl. Baby headphones are perfect for sporting events, car races, music concerts, airports, wedding receptions, movies, machinery and so on. The padded headband and soft ear cushions can bring your child comfy wearing experience while ensuring snug fit. εïзBest Gifts for Baby and Moms. This Noise Cancelling HeadPhone is perfect for newborns and new moms. εïзLifetime Quality Gurrante and Best After-sales Service. You can contact us at anytime with the product, we will provide you satisfied solution for you.",
+                "product_categories": "[Baby Products, Safety, Hearing Protection Earmuffs]",
+                "similarity": 0.37344183369884665,
+                "avg_rating": null,
+                "rating_count": null,
+                "displayed_rating": "4.1",
+                "combined_score": 0.26140928358919263,
+                "reviews": [],
+                "analysis": {
+                    "asin": "B07DG981FC",
+                    "main_selling_points": [
+                        {
+                            "title": "Noise Protection for Babies",
+                            "description": "These baby earmuffs provide a break from external stimulation and protect a baby's hearing. This is especially useful for children with sensory conditions like autism or ADHD by reducing overwhelming external noise."
+                        },
+                        {
+                            "title": "Effective Noise Reduction",
+                            "description": "The earmuffs can reduce noise by up to 26dB, creating a quieter environment for your child, filtering out loud or unpleasant sounds."
+                        },
+                        {
+                            "title": "Safe and Comfortable Design",
+                            "description": "They are designed to be safe and comfortable for babies, using high-quality ABS and soft soundproof cotton. This combination ensures a secure and cozy fit for the child."
+                        },
+                        {
+                            "title": "Versatile and Durable",
+                            "description": "The earmuffs are lightweight, durable, and perfect for various noisy environments, like sporting events or concerts. They can be worn in many situations for optimal hearing protection."
+                        }
+                    ],
+                    "best_for": "These noise-canceling headphones are best for babies and parents who want to protect their baby's hearing in noisy environments, especially for those with sensory sensitivities or the need for a calmer atmosphere. They're useful for outings, travel, or any event with potential loud noises.",
+                    "review_highlights": {
+                        "overall_sentiment": "unknown",
+                        "positive": [],
+                        "negative": []
+                    },
+                    "confidence": null,
+                    "warnings": null,
+                    "notes": null,
+                    "key_specs": [
+                        {
+                            "feature": "Age Range",
+                            "detail": "3 Months to 2 Years"
+                        },
+                        {
+                            "feature": "Material",
+                            "detail": "High-quality ABS, soundproof cotton"
+                        },
+                        {
+                            "feature": "Noise Reduction",
+                            "detail": "26dB"
+                        },
+                        {
+                            "feature": "Use Case",
+                            "detail": "Sporting events, concerts, etc."
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "error": null,
+    "updated_at": "2025-10-26T06:51:51.875820Z"
+}

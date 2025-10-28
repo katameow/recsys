@@ -1,23 +1,40 @@
 from backend.app.db.bigquery_client import BigQueryClient
 from backend.app.llm.vertex_ai_utils import VertexAIClient
-from backend.app.config import BIGQUERY_DATASET_ID, BIGQUERY_PRODUCT_TABLE
-from typing import List, Dict, Any
+from backend.app.config import BIGQUERY_DATASET_ID, BIGQUERY_PRODUCT_TABLE, BIGQUERY_REVIEW_TABLE
+from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional
+import json
+import hashlib
 import logging
 import random
+import time
 
 logger = logging.getLogger(__name__)
+
+
 class SearchEngine:
     def __init__(self, vertex_ai_client: VertexAIClient): # Accept VertexAIClient dependency
         self.bq_client = BigQueryClient()
         self.vertex_client = vertex_ai_client # Use provided VertexAIClient instance
         self.dataset_id = BIGQUERY_DATASET_ID
         self.product_table_id = BIGQUERY_PRODUCT_TABLE
+        self.review_table_id = BIGQUERY_REVIEW_TABLE
         self.product_index_id = f"{BIGQUERY_DATASET_ID}.product_index" # Assuming index name from SQL
 
     # In SearchEngine class
     # Updated hybrid_search method in SearchEngine 
-    async def hybrid_search(self, query: str, products_k: int = 5, reviews_per_product: int = 3):
+    async def hybrid_search(
+        self,
+        query: str,
+        products_k: int = 5,
+        reviews_per_product: int = 3,
+        *,
+        timeline_emit: Optional[Callable[[str, Mapping[str, Any] | None], Awaitable[None]]] = None,
+    ):
         logger.info(f"Starting search for query: '{query}'")
+
+        async def emit(step: str, payload: Mapping[str, Any] | None = None) -> None:
+            if timeline_emit:
+                await timeline_emit(step, payload)
 
         if not query.strip():
             raise ValueError("Query cannot be empty")
@@ -29,118 +46,174 @@ class SearchEngine:
             logger.error(f"Embedding generation failed: {str(e)}")
             raise
 
+        product_candidate_k = min(max(products_k * 4, products_k), 60)
+        review_candidate_k = min(max(products_k * reviews_per_product * 6, reviews_per_product), 300)
+        review_partition_cap = max(reviews_per_product * 3, reviews_per_product)
+
+        embedding_preview = query_embedding[: min(32, len(query_embedding))]
+        embedding_hash = hashlib.sha256(
+            json.dumps(embedding_preview, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+        await emit(
+            "search.bq.started",
+            {
+                "product_candidate_k": product_candidate_k,
+                "review_candidate_k": review_candidate_k,
+                "review_partition_cap": review_partition_cap,
+                "embedding_hash": embedding_hash,
+                "embedding_dims": len(query_embedding),
+                "dataset": self.dataset_id,
+                "product_table": self.product_table_id,
+                "review_table": self.review_table_id,
+            },
+        )
+
         query_sql = f"""
         WITH query_embedding AS (
             SELECT [{",".join(map(str, query_embedding))}] AS embedding
         ),
-        -- Get top matching products using vector search
         product_candidates AS (
             SELECT
                 v.base.asin,
-                v.base.product_title,  
-                v.base.cleaned_item_description,  
-                v.base.product_categories,  
+                v.base.product_title,
+                v.base.cleaned_item_description,
+                v.base.product_categories,
                 CONCAT(
-                v.base.product_title, '\\n', 
-                v.base.cleaned_item_description, '\\n',
-                v.base.product_categories
+                    COALESCE(v.base.product_title, ''), '\\n',
+                    COALESCE(v.base.cleaned_item_description, ''), '\\n',
+                    COALESCE(v.base.product_categories, '')
                 ) AS product_content,
-                v.distance AS product_similarity
-            FROM VECTOR_SEARCH(
-                TABLE `{self.dataset_id}.product_embeddings`,
+                v.distance AS product_distance
+            FROM
+            VECTOR_SEARCH(
+                (
+                    SELECT
+                        asin,
+                        product_title,
+                        cleaned_item_description,
+                        product_categories,
+                        embedding
+                    FROM `{self.dataset_id}.{self.product_table_id}`
+                ),
                 'embedding',
                 (SELECT embedding FROM query_embedding),
-                top_k => {products_k * 5},  -- Increased to get more candidates
-                distance_type => 'COSINE'
-            ) v
+                top_k => {product_candidate_k},
+                distance_type => 'COSINE',
+                options => '{{"fraction_lists_to_search": 0.08}}'
+            ) AS v
         ),
-        -- Find top relevant reviews using vector search - prioritize reviews with ratings
-        review_matches AS (
+        review_candidates AS (
             SELECT
                 v.base.asin,
                 v.base.user_id,
                 v.base.rating,
-                v.base.content AS review_content,
+                v.base.content,
                 v.base.review_timestamp,
                 v.base.verified_purchase,
-                v.distance AS review_similarity,
-                -- Add an indicator for reviews with ratings
+                v.distance AS review_distance,
                 CASE WHEN v.base.rating IS NOT NULL AND v.base.rating > 0 THEN 1 ELSE 0 END AS has_rating
-            FROM VECTOR_SEARCH(
-                TABLE `{self.dataset_id}.review_embeddings`,
+            FROM
+            VECTOR_SEARCH(
+                (
+                    SELECT
+                        asin,
+                        user_id,
+                        rating,
+                        content,
+                        review_timestamp,
+                        verified_purchase,
+                        embedding
+                    FROM `{self.dataset_id}.{self.review_table_id}`
+                ),
                 'embedding',
                 (SELECT embedding FROM query_embedding),
-                top_k => {products_k * reviews_per_product * 10},  -- Increased to find more reviews with ratings
-                distance_type => 'COSINE'
-            ) v
-            WHERE v.base.asin IN (SELECT asin FROM product_candidates)
-            -- Filter reviews that have content
-            AND v.base.content IS NOT NULL AND LENGTH(v.base.content) > 10
+                top_k => {review_candidate_k},
+                distance_type => 'COSINE',
+                options => '{{"fraction_lists_to_search": 0.12}}'
+            ) AS v
+            WHERE v.base.asin IN (SELECT DISTINCT asin FROM product_candidates)
+              AND v.base.content IS NOT NULL
+              AND LENGTH(v.base.content) > 10
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY v.base.asin
+                ORDER BY v.distance, v.base.review_timestamp DESC
+            ) <= {review_partition_cap}
         ),
-        -- Aggregate reviews by product with similarity info - prioritize reviews with ratings
         product_reviews AS (
             SELECT
                 asin,
-                ARRAY_AGG(
-                    STRUCT(
-                        user_id,
-                        rating,
-                        review_content,
-                        review_timestamp,
-                        verified_purchase,
-                        review_similarity,
-                        has_rating
-                    )
-                    ORDER BY has_rating DESC, review_similarity ASC, IFNULL(rating, 0) DESC, review_timestamp DESC
-                    LIMIT {reviews_per_product}
-                ) AS reviews,
-                AVG(CASE WHEN rating IS NOT NULL THEN rating ELSE NULL END) AS avg_rating,
-                COUNT(CASE WHEN rating IS NOT NULL AND rating > 0 THEN 1 ELSE NULL END) AS rating_count,
-                AVG(review_similarity) AS avg_review_similarity
-            FROM review_matches
+                ARRAY_AGG(STRUCT(
+                    content AS review_content,
+                    rating,
+                    review_distance AS review_similarity,
+                    verified_purchase,
+                    user_id,
+                    review_timestamp,
+                    has_rating
+                )
+                ORDER BY review_distance, review_timestamp DESC
+                LIMIT {reviews_per_product}) AS reviews,
+                AVG(CASE WHEN rating IS NOT NULL THEN rating END) AS avg_rating,
+                COUNTIF(rating IS NOT NULL AND rating > 0) AS rating_count,
+                AVG(review_distance) AS avg_review_similarity
+            FROM review_candidates
             GROUP BY asin
         ),
-        -- Prioritize products with better relevant reviews and actual ratings
         product_scores AS (
             SELECT
-                p.asin,
-                p.product_title,
-                p.cleaned_item_description,
-                p.product_categories,
-                p.product_content,
-                p.product_similarity,
-                pr.reviews,
+                pc.asin,
+                pc.product_title,
+                pc.cleaned_item_description,
+                pc.product_categories,
+                pc.product_content,
+                pc.product_distance,
+                COALESCE(pr.reviews, []) AS reviews,
                 pr.avg_rating,
                 pr.rating_count,
-
-                -- Modified combined score with higher weight for products with ratings
-                (0.7 * p.product_similarity) + 
-                (0.2 * COALESCE(pr.avg_review_similarity, 0)) + 
-                (0.1 * COALESCE(pr.avg_rating/5, 0)) AS combined_score
-            FROM product_candidates p
-            LEFT JOIN product_reviews pr ON p.asin = pr.asin
+                (0.7 * pc.product_distance) +
+                (0.2 * COALESCE(pr.avg_review_similarity, 0)) +
+                (0.1 * COALESCE(pr.avg_rating / 5.0, 0)) AS combined_score
+            FROM product_candidates pc
+            LEFT JOIN product_reviews pr USING (asin)
         )
-        -- Final results prioritizing overall relevance
         SELECT
             asin,
             COALESCE(product_title, '') AS product_title,
             COALESCE(cleaned_item_description, '') AS cleaned_item_description,
             COALESCE(product_categories, '') AS product_categories,
             product_content,
-            product_similarity,
+            product_distance AS product_similarity,
             COALESCE(reviews, []) AS reviews,
             avg_rating,
-            rating_count,  -- Added to the output
+            rating_count,
             combined_score
         FROM product_scores
         ORDER BY combined_score DESC
         LIMIT {products_k};
         """
         
+        query_started = time.perf_counter()
         results = await self.bq_client.execute_query(query_sql)
+        latency_ms = (time.perf_counter() - query_started) * 1000
         logger.debug(f"Raw results from BQ: {results}")
         structured = self._structure_results(results)
         logger.info(f"Structured {len(structured)} products")
+        await emit(
+            "search.bq.completed",
+            {
+                "product_count": len(structured),
+                "raw_result_count": len(results) if isinstance(results, list) else None,
+                "latency_ms": round(latency_ms, 2),
+            },
+        )
+        await emit(
+            "search.reviews.selected",
+            {
+                "product_count": len(structured),
+                "products": self._summarize_reviews(structured),
+            },
+        )
         return structured
 
     def _structure_results(self, rows) -> List[Dict[str, Any]]:
@@ -197,6 +270,34 @@ class SearchEngine:
                 continue
                 
         return list(products.values())
+
+    @staticmethod
+    def _summarize_reviews(results: List[Dict[str, Any]], max_products: int = 5, max_reviews: int = 3) -> List[Dict[str, Any]]:
+        summary: List[Dict[str, Any]] = []
+
+        for product in results[:max_products]:
+            reviews = product.get("reviews", []) or []
+            review_summaries = []
+            for review in reviews[:max_reviews]:
+                content = review.get("content") or review.get("review_content") or ""
+                review_summaries.append(
+                    {
+                        "similarity": review.get("similarity") or review.get("review_similarity"),
+                        "rating": review.get("rating"),
+                        "verified_purchase": review.get("verified_purchase"),
+                        "snippet": (content[:120] + "…") if content and len(content) > 120 else content,
+                    }
+                )
+
+            summary.append(
+                {
+                    "asin": product.get("asin"),
+                    "review_count": len(reviews),
+                    "reviews": review_summaries,
+                }
+            )
+
+        return summary
 
 
     async def _generate_query_embedding(self, query: str) -> List[float]:

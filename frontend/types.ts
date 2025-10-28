@@ -1,11 +1,11 @@
 export interface ProductReview {
   content: string
-  rating: number
-  similarity: number
-  verified_purchase: boolean
-  user_id: string
-  timestamp: string
-  has_rating?: number
+  rating?: number | null
+  similarity?: number | null
+  verified_purchase?: boolean | null
+  user_id?: string | null
+  timestamp?: string | null
+  has_rating?: number | null
 }
 
 export interface ReviewHighlightItem {
@@ -59,11 +59,36 @@ export interface ProductRecommendation {
   analysis?: ProductAnalysis
 }
 
+export interface SearchResponse {
+  query: string
+  count: number
+  results: ProductRecommendation[]
+}
+
+export type SearchStatus = "pending" | "completed" | "failed"
+
+export interface SearchResultEnvelope {
+  query_hash: string
+  status: SearchStatus
+  result?: SearchResponse
+  error?: string
+  updated_at?: string | null
+}
+
+export interface SearchAcceptedResponse {
+  query_hash: string
+  result_url: string
+  timeline_url: string
+  status: "pending"
+}
+
 export interface Message {
   id: number
   text: string
   sender: "user" | "ai"
   productRecommendations?: ProductRecommendation[]
+  error?: string
+  meta?: Record<string, unknown>
 }
 
 export interface ChatSession {

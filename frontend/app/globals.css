@@ -2,108 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: "Geist";
-  src: url("https://geist.vercel.app/api/font?name=Geist&weight=400") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Geist";
-  src: url("https://geist.vercel.app/api/font?name=Geist&weight=500") format("woff2");
-  font-weight: 500;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Geist";
-  src: url("https://geist.vercel.app/api/font?name=Geist&weight=600") format("woff2");
-  font-weight: 600;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Geist";
-  src: url("https://geist.vercel.app/api/font?name=Geist&weight=700") format("woff2");
-  font-weight: 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Geist Mono";
-  src: url("https://geist.vercel.app/api/font?name=GeistMono&weight=500") format("woff2");
-  font-weight: 400 700;
-  font-display: swap;
-}
-
 @layer base {
   :root {
-    --font-sans: "Geist", "Geist Sans", "Geist Mono", ui-sans-serif, system-ui,
-      -apple-system, "Segoe UI", sans-serif;
-    --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
-      Consolas, "Liberation Mono", "Courier New", monospace;
-
-    --text-xs: 0.75rem;
-    --text-sm: 0.8125rem;
-    --text-base: 0.9375rem;
-    --text-lg: 1.125rem;
-    --text-xl: 1.25rem;
-    --text-2xl: 1.5rem;
-    --line-height-base: 1.45;
-
-    --surface: 0 0% 100%;
-    --muted-surface: 210 32% 97%;
-    --primary: 217 91% 60%;
-    --secondary: 215 38% 45%;
-    --text: 222 47% 12%;
-    --muted-text: 215 16% 46%;
-    --success: 142 72% 37%;
-    --warning: 36 93% 52%;
-    --danger: 0 84% 64%;
-
-    --card-radius: 0.5rem;
-    --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.04);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
 
     --background: 0 0% 100%;
-    --foreground: 222 47% 12%;
+    --foreground: 222 47% 11%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 12%;
+    --card-foreground: 222 47% 11%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 12%;
-    --muted: 210 32% 97%;
+    --popover-foreground: 222 47% 11%;
+    
+    --primary: 222 47% 11%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 217 91% 60%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 210 40% 96%;
     --muted-foreground: 215 16% 46%;
-    --destructive: 0 84% 64%;
+    
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 86%;
-    --input: 214 32% 86%;
+    
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 217 91% 60%;
-    --radius: var(--card-radius);
+    
+    --radius: 0.75rem;
   }
 
   .dark {
-    --surface: 222 47% 10%;
-    --muted-surface: 215 19% 18%;
-    --primary: 217 91% 60%;
-    --secondary: 217 33% 80%;
-    --text: 0 0% 100%;
-    --muted-text: 215 16% 70%;
-    --success: 142 72% 40%;
-    --warning: 36 93% 52%;
-    --danger: 0 84% 64%;
-
-    --background: 222 47% 10%;
-    --foreground: 0 0% 100%;
-    --card: 222 47% 12%;
-    --card-foreground: 0 0% 100%;
-    --popover: 222 47% 12%;
-    --popover-foreground: 0 0% 100%;
-    --muted: 215 19% 18%;
-    --muted-foreground: 215 12% 70%;
-    --destructive: 0 84% 64%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 19% 24%;
-    --input: 215 19% 24%;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11%;
+    
+    --secondary: 217 91% 60%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 210 40% 98%;
+    
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
     --ring: 217 91% 60%;
   }
 }
@@ -115,26 +88,62 @@
 
   body {
     font-family: var(--font-sans);
-    font-size: var(--text-base);
-    line-height: var(--line-height-base);
-    color: hsl(var(--text));
-    background-color: hsl(var(--surface));
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
+  h1 {
+    @apply text-4xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h4 {
+    @apply text-xl font-semibold;
+  }
+
+  h5 {
+    @apply text-lg font-semibold;
+  }
+
   h6 {
-    font-family: var(--font-sans);
-    font-weight: 600;
+    @apply text-base font-semibold;
   }
 
+  p {
+    @apply leading-7;
+  }
+
+  /* Custom scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
   .skeleton-shimmer {
     position: relative;
     overflow: hidden;
+    @apply bg-muted;
   }
 
   .skeleton-shimmer::after {
@@ -148,7 +157,34 @@
       rgba(255, 255, 255, 0) 100%
     );
     transform: translateX(-100%);
-    animation: skeleton-shimmer 1.6s infinite;
+    animation: skeleton-shimmer 2s infinite;
+  }
+
+  .dark .skeleton-shimmer::after {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-600 {
+    animation-delay: 600ms;
   }
 }
 

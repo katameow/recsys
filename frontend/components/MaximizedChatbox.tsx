@@ -1,7 +1,7 @@
 "use client"
 
-import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Minimize2, MessageSquare, Send, Plus, Trash2 } from "lucide-react"
+import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Minimize2, MessageSquare, Send, Plus, Trash2, MessageCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,9 +20,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ChatRecommendationCard } from "@/components/ChatProductCard"
-import { searchProducts } from "@/utils/api"
-import { Message, ProductRecommendation } from "@/types"
-import { useChatSessionStore, initializeChatSession } from "@/lib/chat-session-store"
+import Timeline from "@/components/Timeline"
+import type { Message, ProductRecommendation, SearchResultEnvelope } from "@/types"
+import { useChatSessionStore, initializeChatSession, type ActiveSearch } from "@/lib/chat-session-store"
 import { useChatActions } from "@/lib/use-chat-actions"
 
 interface MaximizedChatboxProps {
@@ -36,13 +36,15 @@ const promptExamples = [
 ]
 
 export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
-  const { 
-    input, 
-    isLoading, 
-    setInput, 
-    getCurrentMessages, 
-    sessions, 
-    currentSessionId 
+  const {
+    input,
+    isLoading,
+    setInput,
+    getCurrentMessages,
+    sessions,
+    currentSessionId,
+    getActiveSearchForSession,
+    clearActiveSearch,
   } = useChatSessionStore()
   const { sendMessage, startNewConversation, switchToChat, deleteChat } = useChatActions()
   const [activeTab, setActiveTab] = useState("chat")
@@ -57,6 +59,7 @@ export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
   }, [])
 
   const messages = getCurrentMessages()
+  const activeSearch = getActiveSearchForSession(currentSessionId)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -80,33 +83,110 @@ export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
     }
   }
 
+  const handleTimelineCompleted = useCallback((envelope: SearchResultEnvelope) => {
+    const state = useChatSessionStore.getState()
+    
+    // Find the session with matching queryHash that is still pending
+    // Prioritize the current session if it matches
+    let match: [string, ActiveSearch] | undefined
+    
+    // First check if current session has this queryHash
+    if (state.currentSessionId) {
+      const currentSearch = state.activeSearches[state.currentSessionId]
+      if (currentSearch?.queryHash === envelope.query_hash && currentSearch.status === "pending") {
+        match = [state.currentSessionId, currentSearch]
+      }
+    }
+    
+    // If current session doesn't match, search all sessions
+    if (!match) {
+      const allMatches = Object.entries(state.activeSearches).filter(
+        ([, search]) => search?.queryHash === envelope.query_hash && search.status === "pending"
+      )
+      match = allMatches[0] as [string, ActiveSearch] | undefined
+    }
+
+    if (!match) {
+      console.warn('Timeline completed but no pending search found for queryHash:', envelope.query_hash)
+      return
+    }
+
+    const [sessionId, search] = match
+
+    const timestamp = new Date().toISOString()
+
+    if (envelope.status === "completed" && envelope.result) {
+      state.updateActiveSearch(sessionId, {
+        status: "completed",
+        result: envelope.result,
+        completedAt: timestamp,
+        error: undefined,
+      })
+
+      const recommendations: ProductRecommendation[] = envelope.result.results?.map((item) => ({ ...item })) ?? []
+
+      state.addMessageToSession(sessionId, {
+        sender: "ai",
+        text: `Here's what I found for "${envelope.result.query}":`,
+        productRecommendations: recommendations,
+        meta: {
+          query: envelope.result.query,
+          queryHash: envelope.query_hash,
+        },
+      })
+
+      state.setIsLoading(false)
+    } else if (envelope.status === "failed") {
+      state.updateActiveSearch(sessionId, {
+        status: "failed",
+        error: envelope.error ?? "Search failed",
+        completedAt: timestamp,
+      })
+
+      state.addMessageToSession(sessionId, {
+        sender: "ai",
+        text: "I couldn't complete that search. Please try again shortly.",
+        error: envelope.error ?? "Search failed",
+      })
+
+      state.setIsLoading(false)
+    } else {
+      state.updateActiveSearch(sessionId, {
+        status: envelope.status,
+      })
+    }
+  }, [])
+
   const renderMessageBubble = (message: Message) => {
     const isUser = message.sender === "user"
     return (
       <div
         key={message.id}
-        className={`flex flex-col gap-4 ${isUser ? "items-end" : "items-start"}`}
+        className={`flex flex-col gap-4 animate-slide-up ${isUser ? "items-end" : "items-start"}`}
         role="group"
         aria-label={isUser ? "User message" : "Assistant message"}
       >
         <div
-          className={`max-w-3xl rounded-3xl px-5 py-3.5 text-sm leading-relaxed shadow-sm transition ${
+          className={`max-w-2xl rounded-2xl px-5 py-4 text-sm leading-relaxed shadow-sm transition-all ${
             isUser
-              ? "bg-indigo-600 text-white"
-              : "bg-card/95 text-foreground ring-1 ring-border/60"
+              ? "bg-secondary text-secondary-foreground rounded-br-md"
+              : "bg-background border border-border rounded-bl-md ml-0"
           }`}
+          style={{ marginLeft: isUser ? undefined : 0 }}
         >
           {!isUser ? (
-            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Assistant
             </span>
           ) : null}
-          {message.text}
+          <p className="whitespace-pre-wrap">{message.text}</p>
         </div>
         {message.productRecommendations && message.productRecommendations.length > 0 ? (
-          <div className="grid w-full gap-x-10 gap-y-10 justify-items-center items-start sm:grid-cols-1 md:grid-cols-2" aria-label="Recommended products">
+          <div className="grid w-full grid-cols-1 lg:grid-cols-2 gap-12 items-start" aria-label="Recommended products">
             {message.productRecommendations.map((product: ProductRecommendation) => (
-              <ChatRecommendationCard key={product.asin || product.product_title} product={product} maxWidth="820px" />
+              <div key={product.asin || product.product_title} className="w-full">
+                <ChatRecommendationCard product={product} />
+              </div>
             ))}
           </div>
         ) : null}
@@ -115,34 +195,39 @@ export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
   }
 
   const renderLoadingState = () => (
-    <div className="space-y-5" aria-live="polite">
-      <Skeleton shimmer className="h-16 w-3/5 rounded-2xl" />
-      <div className="grid gap-y-8 gap-x-16 justify-items-center items-start sm:grid-cols-1 md:grid-cols-2">
-        {Array.from({ length: 3 }).map((_, index) => (
+    <div className="flex flex-col gap-4 items-start animate-slide-up" aria-live="polite">
+      <div className="max-w-2xl rounded-2xl rounded-bl-md border border-border bg-background px-5 py-4">
+        <Skeleton shimmer className="mb-2 h-3 w-24" />
+        <Skeleton shimmer className="mb-2 h-4 w-full" />
+        <Skeleton shimmer className="h-4 w-4/5" />
+      </div>
+      <div className="grid w-full gap-6 sm:grid-cols-1 md:grid-cols-2 items-start">
+        {Array.from({ length: 2 }).map((_, index) => (
           <div
             key={`loading-card-${index}`}
-            className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm max-w-[820px] w-full"
+            className="flex flex-col gap-3 rounded-xl border bg-background p-4 shadow-sm"
           >
             <div className="flex items-start gap-3">
-              <Skeleton shimmer className="h-16 w-16 rounded-xl" />
+              <Skeleton shimmer className="h-16 w-16 rounded-lg" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3.5 w-1/2" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-2/3" />
               </div>
             </div>
-            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-4/5" />
             <div className="flex gap-2">
-              <Skeleton className="h-6 w-24 rounded-full" />
               <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-16 rounded-full" />
             </div>
-            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
           </div>
         ))}
       </div>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="relative h-2 w-2">
-          <span className="absolute inset-0 animate-ping rounded-full bg-primary/60" aria-hidden="true" />
-          <span className="relative block h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-secondary/60" aria-hidden="true" />
+          <span className="relative block h-2 w-2 rounded-full bg-secondary" aria-hidden="true" />
         </span>
         Gathering matches for you…
       </div>
@@ -187,13 +272,27 @@ export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
 
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-background">
+    <div className="fixed inset-0 z-50 flex bg-background animate-fade-in">
       <Tabs defaultValue="chat" className="flex-1">
         <div className="flex h-full">
-          <aside className="flex w-64 flex-col border-r bg-card/60 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold">AI Shopping Assistant</h2>
-              <Button variant="ghost" size="icon" onClick={onMinimize} aria-label="Minimize chat">
+          <aside className="flex w-72 flex-col border-r bg-muted/30 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary/10">
+                  <MessageCircle className="h-5 w-5 text-secondary" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold">AI Assistant</h2>
+                  <p className="text-xs text-muted-foreground">Shopping helper</p>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onMinimize} 
+                className="h-8 w-8 hover:bg-muted"
+                aria-label="Minimize chat"
+              >
                 <Minimize2 className="h-4 w-4" />
               </Button>
             </div>
@@ -325,7 +424,126 @@ export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
                 aria-relevant="additions text"
                 className="space-y-8 pr-4"
               >
-                {messages.map(renderMessageBubble)}
+                {messages.map((message, index) => {
+                  const shouldShowTimelineBefore =
+                    activeSearch && message.meta?.queryHash === activeSearch.queryHash
+                  
+                  // Show timeline after the last user message if there's an active search and no AI response yet
+                  const isLastUserMessage = message.sender === "user" && index === messages.length - 1
+                  const shouldShowTimelineAfterUser = 
+                    isLastUserMessage && 
+                    activeSearch && 
+                    !messages.some(m => m.meta?.queryHash === activeSearch.queryHash)
+
+                  return (
+                    <div key={`wrapper-${message.id}`} className="space-y-6 w-full">
+                      {shouldShowTimelineBefore ? (
+                        <div className="w-full max-w-4xl rounded-xl border border-border bg-card/80 p-4 shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">Search timeline</p>
+                              <p className="max-w-md truncate text-xs text-muted-foreground">{activeSearch?.query}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  activeSearch?.status === "failed"
+                                    ? "destructive"
+                                    : activeSearch?.status === "completed"
+                                    ? "outline"
+                                    : "secondary"
+                                }
+                              >
+                                {activeSearch?.status === "pending"
+                                  ? "In progress"
+                                  : activeSearch?.status === "completed"
+                                  ? "Completed"
+                                  : "Failed"}
+                              </Badge>
+                              {currentSessionId && activeSearch?.status !== "pending" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7"
+                                  onClick={() => clearActiveSearch(currentSessionId)}
+                                >
+                                  Dismiss
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <Timeline
+                            key={`${activeSearch?.queryHash}-${activeSearch?.startedAt}`}
+                            queryHash={activeSearch!.queryHash}
+                            timelineUrl={activeSearch!.timelineUrl}
+                            resultUrl={activeSearch!.resultUrl}
+                            onCompleted={handleTimelineCompleted}
+                            connectionId={activeSearch!.startedAt}
+                            className="mt-4"
+                          />
+                          {activeSearch?.status === "failed" && activeSearch?.error ? (
+                            <p className="mt-3 text-sm text-destructive">{activeSearch.error}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <div className="w-full">
+                        {renderMessageBubble(message)}
+                      </div>
+
+                      {/* Show timeline after user message if waiting for AI response */}
+                      {shouldShowTimelineAfterUser ? (
+                        <div className="w-full max-w-4xl rounded-xl border border-border bg-card/80 p-4 shadow-sm mt-6">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">Search timeline</p>
+                              <p className="max-w-md truncate text-xs text-muted-foreground">{activeSearch.query}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  activeSearch.status === "failed"
+                                    ? "destructive"
+                                    : activeSearch.status === "completed"
+                                    ? "outline"
+                                    : "secondary"
+                                }
+                              >
+                                {activeSearch.status === "pending"
+                                  ? "In progress"
+                                  : activeSearch.status === "completed"
+                                  ? "Completed"
+                                  : "Failed"}
+                              </Badge>
+                              {currentSessionId && activeSearch.status !== "pending" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7"
+                                  onClick={() => clearActiveSearch(currentSessionId)}
+                                >
+                                  Dismiss
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <Timeline
+                            key={`${activeSearch.queryHash}-${activeSearch.startedAt}`}
+                            queryHash={activeSearch.queryHash}
+                            timelineUrl={activeSearch.timelineUrl}
+                            resultUrl={activeSearch.resultUrl}
+                            onCompleted={handleTimelineCompleted}
+                            connectionId={activeSearch.startedAt}
+                            className="mt-4"
+                          />
+                          {activeSearch.status === "failed" && activeSearch.error ? (
+                            <p className="mt-3 text-sm text-destructive">{activeSearch.error}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
                 {isLoading ? renderLoadingState() : null}
                 {messages.length === 1 && !isLoading ? (
                   <div className="rounded-xl border border-dashed border-border/70 bg-card/80 p-5 text-sm text-muted-foreground">
@@ -417,7 +635,7 @@ export function MaximizedChatbox({ onMinimize }: MaximizedChatboxProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Chat</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>"{getSessionToDeleteTitle()}"</strong>? This action cannot be undone and all messages in this conversation will be permanently removed.
+              Are you sure you want to delete <strong>&ldquo;{getSessionToDeleteTitle()}&rdquo;</strong>? This action cannot be undone and all messages in this conversation will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

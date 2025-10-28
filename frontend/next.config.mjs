@@ -1,3 +1,8 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 let userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
@@ -16,11 +21,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  serverExternalPackages: [],
+  outputFileTracingRoot: path.join(__dirname, '..'),
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
-    serverComponentsExternalPackages: []
   },
 }
 

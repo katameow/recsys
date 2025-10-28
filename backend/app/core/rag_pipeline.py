@@ -6,7 +6,8 @@ import math
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional
+import hashlib
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
@@ -93,7 +94,12 @@ class RAGPipeline:
         self._token_encoder = self._maybe_create_token_encoder()
 
     async def generate_batch_explanations(
-        self, query: str, products: List[Dict[str, Any]], chunk_size: Optional[int] = None
+        self,
+        query: str,
+        products: List[Dict[str, Any]],
+        chunk_size: Optional[int] = None,
+        *,
+        timeline_emit: Optional[Callable[[str, Mapping[str, Any] | None], Awaitable[None]]] = None,
     ) -> List[ProductAnalysis]:
         """Generate structured analyses for a batch of products.
 
@@ -103,6 +109,10 @@ class RAGPipeline:
 
         if not products:
             return []
+
+        async def emit(step: str, payload: Mapping[str, Any] | None = None) -> None:
+            if timeline_emit:
+                await timeline_emit(step, payload)
 
         product_lookup: Dict[str, Dict[str, Any]] = {}
         for product in products:
@@ -118,7 +128,21 @@ class RAGPipeline:
                 "Batching disabled; generating analyses sequentially",
                 extra={"product_count": len(products)},
             )
-            per_product = await self._generate_per_product(query, products)
+            await emit(
+                "rag.chunk.submitted",
+                {
+                    "chunk_index": 0,
+                    "chunk_count": 1,
+                    "chunk_size": len(products),
+                    "product_asins": [product.get("asin") for product in products],
+                    "batching": False,
+                },
+            )
+            per_product = await self._generate_per_product(
+                query,
+                products,
+                timeline_emit=timeline_emit,
+            )
             return self._ordered_results(products, per_product)
 
         analysis_by_asin: Dict[str, ProductAnalysis] = {}
@@ -137,15 +161,34 @@ class RAGPipeline:
             logger.debug(
                 "Processing chunk %s/%s", idx + 1, len(chunks), extra={"chunk_size": len(chunk)}
             )
+            await emit(
+                "rag.chunk.submitted",
+                {
+                    "chunk_index": idx,
+                    "chunk_count": len(chunks),
+                    "chunk_size": len(chunk),
+                    "product_asins": [product.get("asin") for product in chunk],
+                    "batching": True,
+                },
+            )
             success = False
             for attempt in range(2):
                 try:
-                    results = await self._invoke_batch(query, chunk, attempt)
+                    results = await self._invoke_batch(
+                        query,
+                        chunk,
+                        attempt,
+                        timeline_emit=emit,
+                        chunk_index=idx,
+                    )
                     for result in results:
                         if result.asin:
                             product_info = product_lookup.get(result.asin)
-                            analysis_by_asin[result.asin] = self._post_process_analysis(
-                                product_info, result
+                            processed = self._post_process_analysis(product_info, result)
+                            analysis_by_asin[result.asin] = processed
+                            await emit(
+                                "rag.product.analysis",
+                                self._summarize_analysis(processed, product=product_info),
                             )
                     success = True
                     break
@@ -165,19 +208,42 @@ class RAGPipeline:
                     "Falling back to per-product generation for chunk",
                     extra={"chunk_index": idx, "chunk_size": len(chunk)},
                 )
-                per_product = await self._generate_per_product(query, chunk)
+                await emit(
+                    "rag.chunk.fallback",
+                    {
+                        "chunk_index": idx,
+                        "chunk_size": len(chunk),
+                        "product_asins": [product.get("asin") for product in chunk],
+                    },
+                )
+                per_product = await self._generate_per_product(
+                    query,
+                    chunk,
+                    timeline_emit=timeline_emit,
+                )
                 for result in per_product:
                     if result.asin:
                         product_info = product_lookup.get(result.asin)
-                        analysis_by_asin[result.asin] = self._post_process_analysis(
-                            product_info, result
+                        processed = self._post_process_analysis(product_info, result)
+                        analysis_by_asin[result.asin] = processed
+                        await emit(
+                            "rag.product.analysis",
+                            self._summarize_analysis(processed, product=product_info),
                         )
 
         return self._ordered_results(products, list(analysis_by_asin.values()))
-
     async def _invoke_batch(
-        self, query: str, chunk: List[Dict[str, Any]], attempt: int
+        self,
+        query: str,
+        chunk: List[Dict[str, Any]],
+        attempt: int,
+        *,
+        timeline_emit: Optional[Callable[[str, Mapping[str, Any] | None], Awaitable[None]]] = None,
+        chunk_index: Optional[int] = None,
     ) -> List[ProductAnalysis]:
+        async def emit(step: str, payload: Mapping[str, Any] | None = None) -> None:
+            if timeline_emit:
+                await timeline_emit(step, payload)
         extra_instruction = (
             "This is a retry because the previous response was not valid JSON. Ensure the"
             " output is a JSON object that matches the schema exactly."
@@ -193,9 +259,38 @@ class RAGPipeline:
         )
 
         start = time.perf_counter()
+        prompt_hash = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+        await emit(
+            "rag.llm.call.started",
+            {
+                "chunk_index": chunk_index,
+                "chunk_size": len(chunk),
+                "attempt": attempt + 1,
+                "prompt_chars": len(prompt_text),
+                "prompt_hash": prompt_hash,
+            },
+        )
+
         # langchain-core deprecated `apredict` in favor of `ainvoke`.
         # Use `ainvoke` for async invocation of the LLM with the prompt text.
-        raw_output = await self.llm_client.ainvoke(prompt_text)
+        try:
+            raw_output = await self.llm_client.ainvoke(prompt_text)
+        except Exception as exc:
+            latency_ms = (time.perf_counter() - start) * 1000
+            await emit(
+                "rag.llm.call.completed",
+                {
+                    "chunk_index": chunk_index,
+                    "chunk_size": len(chunk),
+                    "attempt": attempt + 1,
+                    "latency_ms": round(latency_ms, 2),
+                    "prompt_hash": prompt_hash,
+                    "success": False,
+                    "error": str(exc),
+                },
+            )
+            raise
+
         latency_ms = (time.perf_counter() - start) * 1000
         logger.info(
             "LLM batch call complete",
@@ -205,8 +300,41 @@ class RAGPipeline:
                 "latency_ms": round(latency_ms, 2),
             },
         )
+        output_text = raw_output if isinstance(raw_output, str) else str(raw_output)
+        response_hash = hashlib.sha256(output_text.encode("utf-8")).hexdigest()
 
-        parsed: BatchProductAnalysis = self.batch_parser.parse(raw_output)
+        try:
+            parsed: BatchProductAnalysis = self.batch_parser.parse(raw_output)
+        except Exception as exc:
+            await emit(
+                "rag.llm.call.completed",
+                {
+                    "chunk_index": chunk_index,
+                    "chunk_size": len(chunk),
+                    "attempt": attempt + 1,
+                    "latency_ms": round(latency_ms, 2),
+                    "prompt_hash": prompt_hash,
+                    "response_hash": response_hash,
+                    "success": False,
+                    "error": str(exc),
+                },
+            )
+            raise
+
+        await emit(
+            "rag.llm.call.completed",
+            {
+                "chunk_index": chunk_index,
+                "chunk_size": len(chunk),
+                "attempt": attempt + 1,
+                "latency_ms": round(latency_ms, 2),
+                "prompt_hash": prompt_hash,
+                "response_hash": response_hash,
+                "result_count": len(parsed.results),
+                "success": True,
+            },
+        )
+
         logger.info(
             "Parsed batch chunk",
             extra={"chunk_size": len(chunk), "parsed_count": len(parsed.results)},
@@ -214,17 +342,36 @@ class RAGPipeline:
         return parsed.results
 
     async def _generate_per_product(
-        self, query: str, products: List[Dict[str, Any]]
+        self,
+        query: str,
+        products: List[Dict[str, Any]],
+        *,
+        timeline_emit: Optional[Callable[[str, Mapping[str, Any] | None], Awaitable[None]]] = None,
     ) -> List[ProductAnalysis]:
         results: List[ProductAnalysis] = []
+
+        async def emit(step: str, payload: Mapping[str, Any] | None = None) -> None:
+            if timeline_emit:
+                await timeline_emit(step, payload)
+
         for product in products:
             generated = False
             for attempt in range(2):
                 try:
-                    batch_results = await self._invoke_batch(query, [product], attempt)
+                    batch_results = await self._invoke_batch(
+                        query,
+                        [product],
+                        attempt,
+                        timeline_emit=timeline_emit,
+                        chunk_index=None,
+                    )
                     if batch_results:
                         processed = self._post_process_analysis(product, batch_results[0])
                         results.append(processed)
+                        await emit(
+                            "rag.product.analysis",
+                            self._summarize_analysis(processed, product=product),
+                        )
                         generated = True
                         break
                 except (OutputParserException, ValidationError) as exc:
@@ -242,9 +389,64 @@ class RAGPipeline:
                     "Unable to generate structured analysis for product; returning placeholder",
                     extra={"asin": product.get("asin")},
                 )
-                results.append(self._placeholder_analysis(product))
+                placeholder = self._placeholder_analysis(product)
+                results.append(placeholder)
+                await emit(
+                    "rag.product.analysis",
+                    {
+                        "asin": placeholder.asin,
+                        "status": "placeholder",
+                        "warnings": placeholder.warnings,
+                    },
+                )
 
         return results
+
+    @staticmethod
+    def _summarize_analysis(
+        analysis: ProductAnalysis,
+        *,
+        product: Optional[Dict[str, Any]] = None,
+        max_points: int = 3,
+    ) -> Dict[str, Any]:
+        def _coerce_point(point: Any) -> Dict[str, Optional[str]]:
+            if hasattr(point, "model_dump"):
+                data = point.model_dump()
+            elif isinstance(point, dict):
+                data = point
+            else:
+                data = {"description": str(point)}
+
+            title = data.get("title")
+            description = data.get("description") or data.get("summary") or ""
+            snippet = (
+                description[:120] + "…"
+                if isinstance(description, str) and len(description) > 120
+                else description
+            )
+            return {
+                "title": title,
+                "description": snippet,
+            }
+
+        main_points = [
+            _coerce_point(point)
+            for point in (analysis.main_selling_points or [])[:max_points]
+        ]
+
+        positive_highlights = analysis.review_highlights.positive if analysis.review_highlights else []
+        negative_highlights = analysis.review_highlights.negative if analysis.review_highlights else []
+
+        return {
+            "asin": analysis.asin,
+            "product_title": product.get("product_title") if product else None,
+            "best_for": analysis.best_for,
+            "main_points": main_points,
+            "key_specs_count": len(analysis.key_specs or []),
+            "positive_highlights": len(positive_highlights),
+            "negative_highlights": len(negative_highlights),
+            "warnings": analysis.warnings or [],
+        }
 
     def _post_process_analysis(
         self, product: Optional[Dict[str, Any]], analysis: ProductAnalysis

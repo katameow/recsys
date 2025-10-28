@@ -1,6 +1,18 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { ChatSession, Message } from '@/types'
+import { ChatSession, Message, SearchResponse, SearchStatus } from '@/types'
+
+export interface ActiveSearch {
+  query: string
+  queryHash: string
+  timelineUrl: string
+  resultUrl: string
+  status: SearchStatus
+  error?: string
+  result?: SearchResponse
+  startedAt: string
+  completedAt?: string
+}
 
 interface ChatSessionState {
   currentSessionId: string | null
@@ -8,16 +20,22 @@ interface ChatSessionState {
   input: string
   isLoading: boolean
   messageCounter: number
+  activeSearches: Record<string, ActiveSearch | null>
   
   // Actions
   createNewSession: () => string
   switchToSession: (sessionId: string) => void
   getCurrentSession: () => ChatSession | null
+  addMessageToSession: (sessionId: string, message: Omit<Message, 'id'>) => void
   addMessageToCurrentSession: (message: Omit<Message, 'id'>) => void
   setInput: (input: string) => void
   setIsLoading: (isLoading: boolean) => void
   deleteSession: (sessionId: string) => void
   getCurrentMessages: () => Message[]
+  getActiveSearchForSession: (sessionId: string | null) => ActiveSearch | null
+  setActiveSearch: (sessionId: string, search: ActiveSearch) => void
+  updateActiveSearch: (sessionId: string, partial: Partial<ActiveSearch>) => void
+  clearActiveSearch: (sessionId: string) => void
 }
 
 const initialMessage: Message = {
@@ -58,16 +76,29 @@ export const useChatSessionStore = create<ChatSessionState>()(
       input: '',
       isLoading: false,
       messageCounter: 2,
+      activeSearches: {},
 
       createNewSession: () => {
         const newSession = createInitialSession()
-        set((state) => ({
+        const state = get()
+        
+        // Preserve isLoading state if the current session has an active search
+        const currentHasActiveSearch = state.currentSessionId 
+          ? state.activeSearches[state.currentSessionId]?.status === 'pending'
+          : false
+        
+        set({
           sessions: [newSession, ...state.sessions],
           currentSessionId: newSession.id,
           messageCounter: 2,
           input: '',
-          isLoading: false
-        }))
+          // Only set isLoading to false if we're not switching away from an active search
+          isLoading: currentHasActiveSearch ? state.isLoading : false,
+          activeSearches: {
+            ...state.activeSearches,
+            [newSession.id]: null,
+          }
+        })
         return newSession.id
       },
 
@@ -78,7 +109,11 @@ export const useChatSessionStore = create<ChatSessionState>()(
             currentSessionId: sessionId,
             messageCounter: Math.max(...session.messages.map(m => m.id)) + 1,
             input: '',
-            isLoading: false
+            isLoading: false,
+            activeSearches: {
+              ...get().activeSearches,
+              [sessionId]: get().activeSearches[sessionId] ?? null,
+            }
           })
         }
       },
@@ -94,9 +129,9 @@ export const useChatSessionStore = create<ChatSessionState>()(
         return currentSession?.messages || []
       },
 
-      addMessageToCurrentSession: (message) => {
-        const { currentSessionId, messageCounter, sessions } = get()
-        if (!currentSessionId) return
+      addMessageToSession: (sessionId, message) => {
+        const { messageCounter, sessions } = get()
+        if (!sessionId) return
 
         const newMessage: Message = {
           id: messageCounter,
@@ -107,7 +142,7 @@ export const useChatSessionStore = create<ChatSessionState>()(
         
         set((state) => ({
           sessions: state.sessions.map(session => 
-            session.id === currentSessionId 
+            session.id === sessionId 
               ? {
                   ...session,
                   messages: [...session.messages, newMessage],
@@ -122,6 +157,12 @@ export const useChatSessionStore = create<ChatSessionState>()(
         }))
       },
 
+      addMessageToCurrentSession: (message) => {
+        const { currentSessionId } = get()
+        if (!currentSessionId) return
+        get().addMessageToSession(currentSessionId, message)
+      },
+
       setInput: (input) => set({ input }),
 
       setIsLoading: (isLoading) => set({ isLoading }),
@@ -129,28 +170,79 @@ export const useChatSessionStore = create<ChatSessionState>()(
       deleteSession: (sessionId) => {
         const { currentSessionId, sessions } = get()
         const updatedSessions = sessions.filter(s => s.id !== sessionId)
-        
+
         set((state) => {
-          const newState: Partial<ChatSessionState> = {
-            sessions: updatedSessions
-          }
-          
-          // If we deleted the current session, switch to another or create new
+          let nextSessions = updatedSessions
+          let nextCurrentId = state.currentSessionId
+          let nextMessageCounter = state.messageCounter
+          const nextActiveSearches = { ...state.activeSearches }
+          delete nextActiveSearches[sessionId]
+
           if (currentSessionId === sessionId) {
             if (updatedSessions.length > 0) {
-              newState.currentSessionId = updatedSessions[0].id
-              newState.messageCounter = Math.max(...updatedSessions[0].messages.map(m => m.id)) + 1
+              const fallback = updatedSessions[0]
+              nextCurrentId = fallback.id
+              nextMessageCounter = Math.max(...fallback.messages.map(m => m.id)) + 1
+              nextActiveSearches[fallback.id] = nextActiveSearches[fallback.id] ?? null
             } else {
-              // Create a new session if no sessions left
               const newSession = createInitialSession()
-              newState.sessions = [newSession]
-              newState.currentSessionId = newSession.id
-              newState.messageCounter = 2
+              nextSessions = [newSession]
+              nextCurrentId = newSession.id
+              nextMessageCounter = 2
+              nextActiveSearches[newSession.id] = null
             }
           }
-          
-          return { ...state, ...newState }
+
+          return {
+            ...state,
+            sessions: nextSessions,
+            currentSessionId: nextCurrentId,
+            messageCounter: nextMessageCounter,
+            activeSearches: nextActiveSearches,
+          }
         })
+      },
+
+      getActiveSearchForSession: (sessionId) => {
+        if (!sessionId) return null
+        return get().activeSearches[sessionId] ?? null
+      },
+
+      setActiveSearch: (sessionId, search) => {
+        set((state) => ({
+          activeSearches: {
+            ...state.activeSearches,
+            [sessionId]: search,
+          },
+        }))
+      },
+
+      updateActiveSearch: (sessionId, partial) => {
+        set((state) => {
+          const current = state.activeSearches[sessionId]
+          if (!current) {
+            return state
+          }
+          return {
+            ...state,
+            activeSearches: {
+              ...state.activeSearches,
+              [sessionId]: {
+                ...current,
+                ...partial,
+              },
+            },
+          }
+        })
+      },
+
+      clearActiveSearch: (sessionId) => {
+        set((state) => ({
+          activeSearches: {
+            ...state.activeSearches,
+            [sessionId]: null,
+          },
+        }))
       }
     }),
     {
@@ -159,7 +251,8 @@ export const useChatSessionStore = create<ChatSessionState>()(
       partialize: (state) => ({
         currentSessionId: state.currentSessionId,
         sessions: state.sessions,
-        messageCounter: state.messageCounter
+        messageCounter: state.messageCounter,
+        activeSearches: state.activeSearches
       })
     }
   )

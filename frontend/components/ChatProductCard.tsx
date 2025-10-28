@@ -170,7 +170,7 @@ export function ChatRecommendationCard({
       tabIndex={0}
       aria-label={title}
       className={cn(
-        "group mx-auto relative flex w-full flex-col overflow-hidden rounded-3xl border border-border/70 bg-card/95 shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        "group relative flex w-full flex-col overflow-hidden rounded-3xl border border-border/70 bg-card/95 shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
       )}
       style={cardStyle}
     >
@@ -179,8 +179,8 @@ export function ChatRecommendationCard({
       <div className="flex flex-col gap-6 p-6">
         {/* allow children to stretch full width instead of centering to avoid large side whitespace */}
         <div className="flex flex-col gap-5 items-stretch">
-          <div className="w-full flex items-center justify-center">
-            <div className="relative flex h-48 md:h-60 lg:h-72 w-full max-w-[48rem] md:max-w-[72rem] items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/40 shadow-inner">
+            <div className="w-full flex items-center justify-center">
+            <div className="relative flex h-64 md:h-80 lg:h-96 w-full max-w-[64rem] md:max-w-[96rem] items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-muted/40 shadow-inner">
               {productImage ? (
                 <img src={productImage} alt={imageAlt} className="h-full w-full object-cover" loading="lazy" />
               ) : (
@@ -190,7 +190,7 @@ export function ChatRecommendationCard({
           </div>
 
           {/* content column: allow the content to grow and use a larger responsive max-width */}
-          <div className="w-full flex min-w-0 flex-1 flex-col gap-4 max-w-[48rem] md:max-w-[72rem]">
+          <div className="w-full flex min-w-0 flex-1 flex-col gap-4 max-w-[64rem] md:max-w-[96rem]">
             <div className="space-y-3">
               <div className="space-y-2">
                 <h3 className="text-xl font-semibold leading-snug text-foreground">{title}</h3>

@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Test & tooling dependencies
+pytest
+pytest-asyncio
+fakeredis>=2.23
